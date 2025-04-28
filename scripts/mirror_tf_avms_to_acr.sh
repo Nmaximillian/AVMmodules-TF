@@ -20,16 +20,15 @@ if [[ ! -s avm_index.csv ]]; then
   exit 1
 fi
 
-# Process CSV, skipping the header
- tail -n +2 avm_index.csv | while IFS=',' read -r _ module_name _ _ badge _; do
-
-  # Clean module name and version
-  module_name=$(echo "$module_name" | tr -d '"')
-  version=$(echo "$badge" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-
-  if [[ -z "$module_name" || -z "$version" ]]; then
-    continue
-  fi
+# Process CSV with awk (skip header)
+awk -F',' 'NR > 1 { 
+  gsub(/^"|"$/, "", $2); module_name=$2
+  gsub(/^"|"$/, "", $5); badge=$5
+  match(badge, /[0-9]+\.[0-9]+\.[0-9]+/, v);
+  if (v[0] != "") {
+    print module_name "," v[0]
+  }
+}' avm_index.csv | while IFS=',' read -r module_name version; do
 
   # Filter modules if specified
   if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
