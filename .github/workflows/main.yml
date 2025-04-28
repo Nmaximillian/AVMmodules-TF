@@ -1,0 +1,36 @@
+name: Sync Terraform AVMs to Private ACR
+
+on:
+  workflow_dispatch:
+
+env:
+  ACR_NAME: avmmodulesbc # <-- your ACR name
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Upgrade Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+      - name: Install ORAS CLI
+        run: |
+          curl -sSL https://github.com/oras-project/oras/releases/latest/download/oras_$(uname -s)_$(uname -m).tar.gz | tar -xz -C /usr/local/bin oras
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Sync Terraform AVM Modules to ACR with exact versions
+        run: |
+          chmod +x ./scripts/mirror_tf_avms_to_acr.sh
+          ./scripts/mirror_tf_avms_to_acr.sh
