@@ -77,10 +77,20 @@ awk -F',' 'NR > 1 {
     cd ../.. && continue
   }
 
-  oras push "$ACR_NAME/$OCI_PATH:$version" \
-    --artifact-type application/vnd.module.terraform \
-    ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; cd ../.. && continue; }
+ # Gather all .tf and .md files
+mapfile -t files_to_push < <(find . -type f \( -iname "*.tf" -o -iname "*.md" \))
 
+if [[ ${#files_to_push[@]} -eq 0 ]]; then
+  echo "⚠️ No .tf or .md files found in module directory — skipping $module_name"
+  cd ../.. && continue
+fi
+
+oras push "$ACR_NAME/$OCI_PATH:$version" \
+  --artifact-type application/vnd.module.terraform \
+  "${files_to_push[@]}" || {
+    echo "⚠️ Failed to push $OCI_PATH:$version";
+    cd ../.. && continue;
+}
   echo "✅ Mirrored: $OCI_PATH:$version"
 
   cd ../..
