@@ -34,8 +34,8 @@ awk -F',' 'NR > 1 {
   gsub(/^"|"$/, "", $8); repo_url=$8
   gsub(/^"|"$/, "", $9); registry_url=$9
   if (status ~ /Available/ && repo_url ~ /^https:\/\/github.com/) {
-    split(registry_url, parts, "/")
-    version = parts[length(parts)]
+    n = split(registry_url, parts, "/")
+    version = parts[n]
     print module_name "," repo_url "," version
   }
 }' avm_index.csv | sort | uniq | while IFS=',' read -r module_name repo_url version; do
@@ -58,9 +58,6 @@ awk -F',' 'NR > 1 {
   rm -rf "$module_name"
   git clone --depth 1 "$repo_url" "$module_name"
   cd "$module_name"
-
-  # Optional: checkout specific tag if needed
-  # git checkout tags/$version || echo "⚠️ No tag $version found, staying on default branch"
 
   echo "📦 Packaging and pushing $module_name:$version"
 
