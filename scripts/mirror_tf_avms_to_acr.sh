@@ -68,29 +68,37 @@ awk -F',' 'NR > 1 {
   git clone --depth 1 "$repo_url" "$module_name"
   cd "$module_name"
 
-  echo "📦 Packaging and pushing $module_name:$version"
+  echo "🔍 Searching for .tf files..."
+  CONTENT_DIR=$(find . -type f -name "*.tf" | head -n 1 | xargs dirname)
+
+  if [[ -z "$CONTENT_DIR" ]]; then
+    echo "⚠️ No Terraform files found in repo — skipping $module_name"
+    cd ../.. && continue
+  fi
+
+  echo "📦 Packaging and pushing $module_name:$version from $CONTENT_DIR"
 
   OCI_PATH="$module_name/azurerm"
-
   az acr login --name "${ACR_NAME%%.azurecr.io}" || {
     echo "⚠️ Failed to login to ACR";
     cd ../.. && continue
   }
 
- # Gather all .tf and .md files
-mapfile -t files_to_push < <(find . -type f \( -iname "*.tf" -o -iname "*.md" \))
+  readarray -t files < <(find "$CONTENT_DIR" -type f \( -name "*.tf" -o -name "*.md" \))
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "⚠️ No files to push for $module_name"
+    cd ../.. && continue
+  fi
 
-if [[ ${#files_to_push[@]} -eq 0 ]]; then
-  echo "⚠️ No .tf or .md files found in module directory — skipping $module_name"
-  cd ../.. && continue
-fi
+  echo "📂 Files to be pushed:"
+  printf ' - %s\n' "${files[@]}"
 
-oras push "$ACR_NAME/$OCI_PATH:$version" \
-  --artifact-type application/vnd.module.terraform \
-  "${files_to_push[@]}" || {
-    echo "⚠️ Failed to push $OCI_PATH:$version";
-    cd ../.. && continue;
-}
+  oras push "$ACR_NAME/$OCI_PATH:$version" \
+    --artifact-type application/vnd.module.terraform \
+    "${files[@]}" || {
+      echo "⚠️ Failed to push $OCI_PATH:$version"; cd ../.. && continue;
+    }
+
   echo "✅ Mirrored: $OCI_PATH:$version"
 
   cd ../..
