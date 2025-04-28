@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  ACR_NAME: avmmodulestf # <-- your ACR name
+  ACR_NAME: avmmodulestf.azurecr.io
 
 jobs:
   mirror:
