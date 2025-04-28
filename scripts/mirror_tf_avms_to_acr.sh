@@ -21,6 +21,9 @@ if [[ -z "$HTML_CONTENT" ]]; then
   exit 1
 fi
 
+echo "🔍 Dumping HTML content for debug:"
+echo "$HTML_CONTENT" | head -n 50
+
 # Extract modules using awk (safe across environments)
 MODULE_NAMES=$(echo "$HTML_CONTENT" | awk -F 'href="' '/href/ {split($2,a,"/"); print a[1]}' | grep -v '^\.\.$' | sort | uniq)
 
