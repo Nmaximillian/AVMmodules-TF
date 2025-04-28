@@ -32,10 +32,13 @@ awk -F',' 'NR > 1 {
   gsub(/^"|"$/, "", $5); module_name=$5
   gsub(/^"|"$/, "", $7); status=$7
   gsub(/^"|"$/, "", $8); repo_url=$8
+  gsub(/^"|"$/, "", $9); registry_url=$9
   if (status ~ /Available/ && repo_url ~ /^https:\/\/github.com/) {
-    print module_name "," repo_url
+    split(registry_url, parts, "/")
+    version = parts[length(parts)]
+    print module_name "," repo_url "," version
   }
-}' avm_index.csv | sort | uniq | while IFS=',' read -r module_name repo_url; do
+}' avm_index.csv | sort | uniq | while IFS=',' read -r module_name repo_url version; do
 
   echo "🧪 Found available module: $module_name"
 
@@ -45,7 +48,6 @@ awk -F',' 'NR > 1 {
     continue
   fi
 
-  version="latest"
   if [[ -n "$FILTER_VERSIONS" ]]; then
     version="$FILTER_VERSIONS"
   fi
