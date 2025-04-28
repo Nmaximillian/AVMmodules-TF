@@ -48,7 +48,8 @@ awk -F',' 'NR > 1 {
 
   # Extract version number using Terraform Registry API
   api_url="https://registry.terraform.io/v1/modules/${registry_url#https://registry.terraform.io/modules/}"
-  version=$(curl -s "$api_url" | jq -r '.version')
+  version=$(curl -s "$api_url" | jq -r '.modules[0].versions[-1].version')
+
 
   echo "📌 Extracted version: $version from $api_url"
 
