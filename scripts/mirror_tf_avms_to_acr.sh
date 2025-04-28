@@ -2,51 +2,63 @@
 
 set -euo pipefail
 
-AVM_INDEX_URL="https://azure.github.io/Azure-Verified-Modules/indexes/terraform/tf-resource-modules/index.json"
-ACR_NAME="${ACR_NAME:-myacr.azurecr.io}"  # Default fallback if not passed as env var
-FILTER_MODULES="${FILTER_MODULES:-}"       # Optional comma-separated list to mirror only specific modules
+AVM_INDEX_URL="https://azure.github.io/Azure-Verified-Modules/indexes/terraform/tf-resource-modules/"
+ACR_NAME="${ACR_NAME:-myacr.azurecr.io}"
+FILTER_MODULES="res-app-containerapp" FILTER_VERSIONS="0.2.1" ./scripts/mirror_tf_avms_to_acr.sh
 FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mirror only specific versions
 
-# Install jq and oras if needed
+# Install required tools
 command -v jq >/dev/null 2>&1 || { echo >&2 "jq is required but not installed. Exiting."; exit 1; }
+command -v curl >/dev/null 2>&1 || { echo >&2 "curl is required but not installed. Exiting."; exit 1; }
 command -v oras >/dev/null 2>&1 || { echo >&2 "oras is required but not installed. Exiting."; exit 1; }
 
-# Fetch the index.json
-echo "Fetching AVM Terraform index..."
-curl -sSL "$AVM_INDEX_URL" -o index.json
+# Fetch the module list HTML
+echo "Fetching AVM Terraform module list..."
+HTML_CONTENT=$(curl -sSL "$AVM_INDEX_URL")
 
-# Loop through each module
-jq -c '.modules[]' index.json | while read -r module; do
-  NAME=$(echo "$module" | jq -r '.name')
-  OCI_NAME=$(echo "$module" | jq -r '.oci.artifact')
-  VERSIONS=$(echo "$module" | jq -r '.versions[]')
+# Extract modules and versions from HTML (grep/sed magic)
+echo "$HTML_CONTENT" | grep -oE 'href="[^"]+/"' | \
+  sed -E 's/href="([^"]+)\/"/\1/' | \
+  sort | uniq | while read -r module_name; do
 
-  # If filtering by modules
-  if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$NAME,"* ]]; then
-    echo "⏭️ Skipping module $NAME (not in FILTER_MODULES)"
+  # Skip invalid entries
+  [[ "$module_name" == ".." ]] && continue
+
+  # Filter modules if specified
+  if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
+    echo "⏭️ Skipping module $module_name (not in FILTER_MODULES)"
     continue
   fi
 
-  echo "\n📦 Mirroring module: $NAME"
+  echo "\n📦 Checking module: $module_name"
 
-  for VERSION in $VERSIONS; do
-    # If filtering by versions
-    if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$VERSION,"* ]]; then
-      echo "⏭️ Skipping version $VERSION (not in FILTER_VERSIONS)"
+  # Fetch HTML for module version listing
+  module_url="$AVM_INDEX_URL$module_name/"
+  versions_html=$(curl -sSL "$module_url")
+
+  echo "$versions_html" | grep -oE 'href="[^"]+/"' | \
+    sed -E 's/href="([^"]+)\/"/\1/' | \
+    sort | uniq | while read -r version; do
+
+    # Filter versions if specified
+    if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$version,"* ]]; then
+      echo "⏭️ Skipping version $version (not in FILTER_VERSIONS)"
       continue
     fi
 
-    echo "🔄 Version: $VERSION"
+    echo "🔄 Mirroring $module_name:$version"
+
+    OCI_PATH="avm-$module_name/azurerm"
 
     # Pull from GHCR
-    oras pull "ghcr.io/azure/$OCI_NAME:$VERSION" -a || { echo "⚠️ Failed to pull $OCI_NAME:$VERSION"; continue; }
+    oras pull "ghcr.io/azure/$OCI_PATH:$version" -a || { echo "⚠️ Failed to pull $OCI_PATH:$version"; continue; }
 
     # Push to ACR
-    oras push "$ACR_NAME/$OCI_NAME:$VERSION" \
+    oras push "$ACR_NAME/$OCI_PATH:$version" \
       --artifact-type application/vnd.module.terraform \
-      ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_NAME:$VERSION"; continue; }
+      ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; continue; }
 
-    echo "✅ Mirrored: $OCI_NAME:$VERSION"
+    echo "✅ Mirrored: $OCI_PATH:$version"
 
     # Cleanup local files
     rm -f ./*.tf ./*.md
