@@ -1,0 +1,39 @@
+name: Mirror Single AVM Module to ACR
+
+on:
+  workflow_dispatch:
+
+env:
+  ACR_NAME: avmmodulestf.azurecr.io
+  FILTER_MODULES: avm-res-authorization-roleassignment
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Install Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+      - name: Install ORAS CLI
+        run: |
+          ORAS_VERSION=$(curl -s https://api.github.com/repos/oras-project/oras/releases/latest | jq -r '.tag_name')
+          curl -LO https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_amd64.tar.gz
+          tar -xzf oras_${ORAS_VERSION#v}_linux_amd64.tar.gz oras
+          sudo mv oras /usr/local/bin/
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Run mirror script
+        run: |
+          chmod +x ./scripts/mirror_tf_avms_to_acr.sh
+          ./scripts/mirror_tf_avms_to_acr.sh
