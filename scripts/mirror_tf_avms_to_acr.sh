@@ -2,37 +2,34 @@
 
 set -euo pipefail
 
-AVM_INDEX_URL="https://azure.github.io/Azure-Verified-Modules/indexes/terraform/tf-resource-modules/"
+CSV_URL="https://azure.github.io/Azure-Verified-Modules/module-indexes/TerraformResourceModules.csv"
 ACR_NAME="${ACR_NAME:-myacr.azurecr.io}"
 FILTER_MODULES="${FILTER_MODULES:-}"       # Optional comma-separated list to mirror only specific modules
 FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mirror only specific versions
 
 # Install required tools
-command -v jq >/dev/null 2>&1 || { echo >&2 "jq is required but not installed. Exiting."; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo >&2 "curl is required but not installed. Exiting."; exit 1; }
 command -v oras >/dev/null 2>&1 || { echo >&2 "oras is required but not installed. Exiting."; exit 1; }
 
-# Fetch the module list HTML
-echo "Fetching AVM Terraform module list..."
-HTML_CONTENT=$(curl -sSL "$AVM_INDEX_URL")
+# Fetch the CSV
+echo "📥 Downloading module index CSV..."
+curl -sSL "$CSV_URL" -o avm_index.csv
 
-if [[ -z "$HTML_CONTENT" ]]; then
-  echo "❌ Failed to fetch module index from $AVM_INDEX_URL"
+if [[ ! -s avm_index.csv ]]; then
+  echo "❌ Failed to download or empty CSV at $CSV_URL"
   exit 1
 fi
 
-echo "🔍 Dumping HTML content for debug:"
-echo "$HTML_CONTENT" | head -n 50
+# Process CSV, skipping the header
+ tail -n +2 avm_index.csv | while IFS=',' read -r _ module_name _ _ badge _; do
 
-# Extract modules using awk (safe across environments)
-MODULE_NAMES=$(echo "$HTML_CONTENT" | awk -F 'href="' '/href/ {split($2,a,"/"); print a[1]}' | grep -v '^\.\.$' | sort | uniq)
+  # Clean module name and version
+  module_name=$(echo "$module_name" | tr -d '"')
+  version=$(echo "$badge" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 
-if [[ -z "$MODULE_NAMES" ]]; then
-  echo "❌ No module names found in index HTML. Check parsing logic or page structure."
-  exit 1
-fi
-
-echo "$MODULE_NAMES" | while read -r module_name; do
+  if [[ -z "$module_name" || -z "$version" ]]; then
+    continue
+  fi
 
   # Filter modules if specified
   if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
@@ -40,45 +37,31 @@ echo "$MODULE_NAMES" | while read -r module_name; do
     continue
   fi
 
-  echo "\n📦 Checking module: $module_name"
-
-  # Fetch HTML for module version listing
-  module_url="$AVM_INDEX_URL$module_name/"
-  versions_html=$(curl -sSL "$module_url")
-
-  version_names=$(echo "$versions_html" | awk -F 'href="' '/href/ {split($2,a,"/"); print a[1]}' | grep -v '^\.\.$' | sort | uniq)
-
-  if [[ -z "$version_names" ]]; then
-    echo "⚠️ No versions found for $module_name"
+  # Filter versions if specified
+  if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$version,"* ]]; then
+    echo "⏭️ Skipping version $version (not in FILTER_VERSIONS)"
     continue
   fi
 
-  echo "$version_names" | while read -r version; do
+  echo "🔄 Mirroring $module_name:$version"
 
-    # Filter versions if specified
-    if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$version,"* ]]; then
-      echo "⏭️ Skipping version $version (not in FILTER_VERSIONS)"
-      continue
-    fi
+  OCI_PATH="$module_name/azurerm"
 
-    echo "🔄 Mirroring $module_name:$version"
+  # Pull from GHCR
+  oras pull "ghcr.io/azure/$OCI_PATH:$version" -a || { echo "⚠️ Failed to pull $OCI_PATH:$version"; continue; }
 
-    OCI_PATH="avm-$module_name/azurerm"
+  # Push to ACR
+  oras push "$ACR_NAME/$OCI_PATH:$version" \
+    --artifact-type application/vnd.module.terraform \
+    ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; continue; }
 
-    # Pull from GHCR
-    oras pull "ghcr.io/azure/$OCI_PATH:$version" -a || { echo "⚠️ Failed to pull $OCI_PATH:$version"; continue; }
+  echo "✅ Mirrored: $OCI_PATH:$version"
 
-    # Push to ACR
-    oras push "$ACR_NAME/$OCI_PATH:$version" \
-      --artifact-type application/vnd.module.terraform \
-      ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; continue; }
-
-    echo "✅ Mirrored: $OCI_PATH:$version"
-
-    # Cleanup local files
-    rm -f ./*.tf ./*.md
-  done
+  # Cleanup local files
+  rm -f ./*.tf ./*.md
 
 done
+
+rm -f avm_index.csv
 
 echo "\n✅ All done."
