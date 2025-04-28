@@ -16,6 +16,11 @@ command -v oras >/dev/null 2>&1 || { echo >&2 "oras is required but not installe
 echo "Fetching AVM Terraform module list..."
 HTML_CONTENT=$(curl -sSL "$AVM_INDEX_URL")
 
+if [[ -z "$HTML_CONTENT" ]]; then
+  echo "❌ Failed to fetch module index from $AVM_INDEX_URL"
+  exit 1
+fi
+
 # Extract modules and versions from HTML (grep/sed magic)
 echo "$HTML_CONTENT" | grep -oE 'href="[^"]+/"' | \
   sed -E 's/href="([^"]+)\/"/\1/' | \
