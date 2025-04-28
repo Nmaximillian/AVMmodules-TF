@@ -21,7 +21,7 @@ if [[ ! -s avm_index.csv ]]; then
 fi
 
 # Process CSV with awk (skip header)
-awk -F',' 'NR > 1 { 
+awk -F',' 'NR > 1 {
   gsub(/^"|"$/, "", $2); module_name=$2
   gsub(/^"|"$/, "", $5); badge=$5
   match(badge, /[0-9]+\.[0-9]+\.[0-9]+/, v);
@@ -29,6 +29,8 @@ awk -F',' 'NR > 1 {
     print module_name "," v[0]
   }
 }' avm_index.csv | while IFS=',' read -r module_name version; do
+
+  echo "🧪 Found module: $module_name version: $version"
 
   # Filter modules if specified
   if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
