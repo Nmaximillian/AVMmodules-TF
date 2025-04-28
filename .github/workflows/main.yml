@@ -22,10 +22,13 @@ jobs:
       - name: Upgrade Azure CLI
         run: |
           curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
+          
       - name: Install ORAS CLI
         run: |
-          curl -sSL https://github.com/oras-project/oras/releases/latest/download/oras_$(uname -s)_$(uname -m).tar.gz | tar -xz -C /usr/local/bin oras
+          ORAS_VERSION=$(curl -s https://api.github.com/repos/oras-project/oras/releases/latest | jq -r '.tag_name')
+          curl -LO https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_amd64.tar.gz
+          tar -xzf oras_${ORAS_VERSION#v}_linux_amd64.tar.gz oras
+          sudo mv oras /usr/local/bin/
 
       - name: Install jq
         run: sudo apt-get install -y jq
