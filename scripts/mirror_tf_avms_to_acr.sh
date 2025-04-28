@@ -5,7 +5,7 @@ set -euo pipefail
 CSV_URL="https://azure.github.io/Azure-Verified-Modules/module-indexes/TerraformResourceModules.csv"
 ACR_NAME="${ACR_NAME:-myacr.azurecr.io}"
 FILTER_MODULES="${FILTER_MODULES:-}"       # Optional comma-separated list to mirror only specific modules
-FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mirror only specific versions
+FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mirror only specific versions (only used if you override latest)
 
 # Install required tools
 command -v curl >/dev/null 2>&1 || { echo >&2 "curl is required but not installed. Exiting."; exit 1; }
@@ -26,15 +26,14 @@ head -n 10 avm_index.csv
 
 # Process CSV with awk (skip header)
 awk -F',' 'NR > 1 {
-  gsub(/^"|"$/, "", $2); module_name=$2
-  gsub(/^"|"$/, "", $5); badge=$5
-  match(badge, /[0-9]+\.[0-9]+\.[0-9]+/, v);
-  if (v[0] != "") {
-    print module_name "," v[0]
+  gsub(/^"|"$/, "", $5); module_name=$5
+  gsub(/^"|"$/, "", $7); status=$7
+  if (status ~ /Available/) {
+    print module_name
   }
-}' avm_index.csv | while IFS=',' read -r module_name version; do
+}' avm_index.csv | sort | uniq | while read -r module_name; do
 
-  echo "🧪 Found module: $module_name version: $version"
+  echo "🧪 Found available module: $module_name"
 
   # Filter modules if specified
   if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
@@ -42,10 +41,9 @@ awk -F',' 'NR > 1 {
     continue
   fi
 
-  # Filter versions if specified
-  if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$version,"* ]]; then
-    echo "⏭️ Skipping version $version (not in FILTER_VERSIONS)"
-    continue
+  version="latest"
+  if [[ -n "$FILTER_VERSIONS" ]]; then
+    version="$FILTER_VERSIONS"
   fi
 
   echo "🔄 Mirroring $module_name:$version"
