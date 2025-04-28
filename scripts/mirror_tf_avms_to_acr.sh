@@ -64,6 +64,9 @@ awk -F',' 'NR > 1 {
 
   OCI_PATH="$module_name/azurerm"
 
+  # Authenticate with ACR for ORAS
+  az acr login --name "${ACR_NAME%%.azurecr.io}"
+
   oras push "$ACR_NAME/$OCI_PATH:$version" \
     --artifact-type application/vnd.module.terraform \
     ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; cd ../.. && continue; }
