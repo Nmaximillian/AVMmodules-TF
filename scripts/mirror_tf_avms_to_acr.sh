@@ -21,13 +21,15 @@ if [[ -z "$HTML_CONTENT" ]]; then
   exit 1
 fi
 
-# Extract modules and versions from HTML (grep/sed magic)
-echo "$HTML_CONTENT" | grep -oE 'href="[^"]+/"' | \
-  sed -E 's/href="([^"]+)\/"/\1/' | \
-  sort | uniq | while read -r module_name; do
+# Extract modules from anchor tags with trailing slash
+MODULE_NAMES=$(echo "$HTML_CONTENT" | grep -oP '<a href="\K[^/]+(?=/")')
 
-  # Skip invalid entries
-  [[ "$module_name" == ".." ]] && continue
+if [[ -z "$MODULE_NAMES" ]]; then
+  echo "❌ No module names found in index HTML. Check parsing logic or page structure."
+  exit 1
+fi
+
+echo "$MODULE_NAMES" | sort | uniq | while read -r module_name; do
 
   # Filter modules if specified
   if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
@@ -41,9 +43,14 @@ echo "$HTML_CONTENT" | grep -oE 'href="[^"]+/"' | \
   module_url="$AVM_INDEX_URL$module_name/"
   versions_html=$(curl -sSL "$module_url")
 
-  echo "$versions_html" | grep -oE 'href="[^"]+/"' | \
-    sed -E 's/href="([^"]+)\/"/\1/' | \
-    sort | uniq | while read -r version; do
+  version_names=$(echo "$versions_html" | grep -oP '<a href="\K[^/]+(?=/")')
+
+  if [[ -z "$version_names" ]]; then
+    echo "⚠️ No versions found for $module_name"
+    continue
+  fi
+
+  echo "$version_names" | sort | uniq | while read -r version; do
 
     # Filter versions if specified
     if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$version,"* ]]; then
