@@ -1,33 +1,19 @@
 #!/bin/bash
-
 set -euo pipefail
 
 CSV_URL="https://azure.github.io/Azure-Verified-Modules/module-indexes/TerraformResourceModules.csv"
 ACR_NAME="${ACR_NAME:-myacr.azurecr.io}"
-FILTER_MODULES="${FILTER_MODULES:-}"       # Optional comma-separated list to mirror only specific modules
-FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mirror only specific versions (only used if you override latest)
+FILTER_MODULES="${FILTER_MODULES:-}"
 
-# Install required tools
-command -v curl >/dev/null 2>&1 || { echo >&2 "curl is required but not installed. Exiting."; exit 1; }
-command -v git >/dev/null 2>&1 || { echo >&2 "git is required but not installed. Exiting."; exit 1; }
-command -v oras >/dev/null 2>&1 || { echo >&2 "oras is required but not installed. Exiting."; exit 1; }
+command -v curl >/dev/null || { echo "❌ curl not found"; exit 1; }
+command -v git >/dev/null || { echo "❌ git not found"; exit 1; }
+command -v oras >/dev/null || { echo "❌ oras not found"; exit 1; }
 
-# Fetch the CSV
 echo "📥 Downloading module index CSV..."
 curl -sSL "$CSV_URL" -o avm_index.csv
 
-if [[ ! -s avm_index.csv ]]; then
-  echo "❌ Failed to download or empty CSV at $CSV_URL"
-  exit 1
-fi
-
-# Debug: print the first few lines of the CSV
-echo "📄 First few lines of the CSV:"
-head -n 10 avm_index.csv
-
 mkdir -p temp_clone
 
-# Process CSV and filter for Available modules with GitHub repos
 awk -F',' 'NR > 1 {
   gsub(/^"|"$/, "", $5); module_name=$5
   gsub(/^"|"$/, "", $7); status=$7
@@ -40,45 +26,33 @@ awk -F',' 'NR > 1 {
   }
 }' avm_index.csv | sort | uniq | while IFS=',' read -r module_name repo_url version; do
 
-  echo "🧪 Found available module: $module_name"
+  echo "🧪 Found module: $module_name ($version)"
 
-  # Filter modules if specified
-  if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
-    echo "⏭️ Skipping module $module_name (not in FILTER_MODULES)"
-    continue
+  [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]] && continue
+
+  echo "🔄 Cloning $repo_url"
+  rm -rf "temp_clone/$module_name"
+  git clone "$repo_url" "temp_clone/$module_name"
+
+  pushd "temp_clone/$module_name" >/dev/null
+  if git rev-parse "v$version" >/dev/null 2>&1; then
+    git checkout "v$version"
+  elif git rev-parse "$version" >/dev/null 2>&1; then
+    git checkout "$version"
+  else
+    echo "❌ No matching tag for version $version in $module_name"
+    popd && continue
   fi
-
-  if [[ -n "$FILTER_VERSIONS" ]]; then
-    version="$FILTER_VERSIONS"
-  fi
-
-  echo "🔄 Cloning $repo_url to extract module at version: $version"
-
-  pushd temp_clone >/dev/null
-  rm -rf "$module_name"
-  git clone --depth 1 "$repo_url" "$module_name"
-  cd "$module_name"
-
-  echo "📦 Packaging and pushing $module_name:$version"
 
   OCI_PATH="$module_name/azurerm"
-
-  # Authenticate with ACR for ORAS
+  echo "📦 Pushing to $ACR_NAME/$OCI_PATH:$version"
   az acr login --name "${ACR_NAME%%.azurecr.io}"
-
   oras push "$ACR_NAME/$OCI_PATH:$version" \
     --artifact-type application/vnd.module.terraform \
-    ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; cd ../.. && continue; }
+    ./*.tf ./*.md || echo "⚠️ Failed to push $OCI_PATH:$version"
 
-  echo "✅ Mirrored: $OCI_PATH:$version"
-
-  cd ../..
-  rm -rf "temp_clone/$module_name"
   popd >/dev/null
-
 done
 
-rm -f avm_index.csv
-rm -rf temp_clone
-
-echo "\n✅ All done."
+rm -rf avm_index.csv temp_clone
+echo "✅ Done."
