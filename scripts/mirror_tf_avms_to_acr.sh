@@ -50,8 +50,8 @@ awk -F',' 'NR > 1 {
 
   OCI_PATH="$module_name/azurerm"
 
-  # Pull from GHCR
-  oras pull "ghcr.io/azure/$OCI_PATH:$version" -a || { echo "⚠️ Failed to pull $OCI_PATH:$version"; continue; }
+  # Pull from GHCR (without -a)
+  oras pull "ghcr.io/azure/$OCI_PATH:$version" || { echo "⚠️ Failed to pull $OCI_PATH:$version"; continue; }
 
   # Push to ACR
   oras push "$ACR_NAME/$OCI_PATH:$version" \
