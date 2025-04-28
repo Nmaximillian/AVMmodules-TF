@@ -4,7 +4,7 @@ set -euo pipefail
 
 AVM_INDEX_URL="https://azure.github.io/Azure-Verified-Modules/indexes/terraform/tf-resource-modules/"
 ACR_NAME="${ACR_NAME:-myacr.azurecr.io}"
-FILTER_MODULES="res-app-containerapp" FILTER_VERSIONS="0.2.1" ./scripts/mirror_tf_avms_to_acr.sh
+FILTER_MODULES="${FILTER_MODULES:-}"       # Optional comma-separated list to mirror only specific modules
 FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mirror only specific versions
 
 # Install required tools
