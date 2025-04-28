@@ -20,6 +20,10 @@ if [[ ! -s avm_index.csv ]]; then
   exit 1
 fi
 
+# Debug: print the first few lines of the CSV
+echo "📄 First few lines of the CSV:"
+head -n 10 avm_index.csv
+
 # Process CSV with awk (skip header)
 awk -F',' 'NR > 1 {
   gsub(/^"|"$/, "", $2); module_name=$2
