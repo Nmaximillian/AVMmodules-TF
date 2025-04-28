@@ -5,6 +5,7 @@ on:
 
 env:
   ACR_NAME: avmmodulestf.azurecr.io
+  FILTER_MODULES: avm-res-authorization-roleassignment
 
 jobs:
   mirror:
