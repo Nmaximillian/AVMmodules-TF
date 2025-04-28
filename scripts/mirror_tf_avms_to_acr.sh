@@ -9,6 +9,7 @@ FILTER_VERSIONS="${FILTER_VERSIONS:-}"     # Optional comma-separated list to mi
 
 # Install required tools
 command -v curl >/dev/null 2>&1 || { echo >&2 "curl is required but not installed. Exiting."; exit 1; }
+command -v git >/dev/null 2>&1 || { echo >&2 "git is required but not installed. Exiting."; exit 1; }
 command -v oras >/dev/null 2>&1 || { echo >&2 "oras is required but not installed. Exiting."; exit 1; }
 
 # Fetch the CSV
@@ -24,14 +25,17 @@ fi
 echo "📄 First few lines of the CSV:"
 head -n 10 avm_index.csv
 
-# Process CSV with awk (skip header)
+mkdir -p temp_clone
+
+# Process CSV and filter for Available modules with GitHub repos
 awk -F',' 'NR > 1 {
   gsub(/^"|"$/, "", $5); module_name=$5
   gsub(/^"|"$/, "", $7); status=$7
-  if (status ~ /Available/) {
-    print module_name
+  gsub(/^"|"$/, "", $8); repo_url=$8
+  if (status ~ /Available/ && repo_url ~ /^https:\/\/github.com/) {
+    print module_name "," repo_url
   }
-}' avm_index.csv | sort | uniq | while read -r module_name; do
+}' avm_index.csv | sort | uniq | while IFS=',' read -r module_name repo_url; do
 
   echo "🧪 Found available module: $module_name"
 
@@ -46,25 +50,33 @@ awk -F',' 'NR > 1 {
     version="$FILTER_VERSIONS"
   fi
 
-  echo "🔄 Mirroring $module_name:$version"
+  echo "🔄 Cloning $repo_url to extract module at version: $version"
+
+  pushd temp_clone >/dev/null
+  rm -rf "$module_name"
+  git clone --depth 1 "$repo_url" "$module_name"
+  cd "$module_name"
+
+  # Optional: checkout specific tag if needed
+  # git checkout tags/$version || echo "⚠️ No tag $version found, staying on default branch"
+
+  echo "📦 Packaging and pushing $module_name:$version"
 
   OCI_PATH="$module_name/azurerm"
 
-  # Pull from GHCR (without -a)
-  oras pull "ghcr.io/azure/$OCI_PATH:$version" || { echo "⚠️ Failed to pull $OCI_PATH:$version"; continue; }
-
-  # Push to ACR
   oras push "$ACR_NAME/$OCI_PATH:$version" \
     --artifact-type application/vnd.module.terraform \
-    ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; continue; }
+    ./*.tf ./*.md || { echo "⚠️ Failed to push $OCI_PATH:$version"; cd ../.. && continue; }
 
   echo "✅ Mirrored: $OCI_PATH:$version"
 
-  # Cleanup local files
-  rm -f ./*.tf ./*.md
+  cd ../..
+  rm -rf "temp_clone/$module_name"
+  popd >/dev/null
 
 done
 
 rm -f avm_index.csv
+rm -rf temp_clone
 
 echo "\n✅ All done."
