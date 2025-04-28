@@ -1,11 +1,10 @@
-name: Mirror Single AVM Module to ACR
+name: Mirror single AVM Terraform module to private ACR
 
 on:
   workflow_dispatch:
 
 env:
   ACR_NAME: avmmodulestf.azurecr.io
-  FILTER_MODULES: avm-res-authorization-roleassignment
 
 jobs:
   mirror:
@@ -23,17 +22,17 @@ jobs:
         run: |
           curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-      - name: Install ORAS CLI
+      - name: Install ORAS
         run: |
           ORAS_VERSION=$(curl -s https://api.github.com/repos/oras-project/oras/releases/latest | jq -r '.tag_name')
-          curl -LO https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_amd64.tar.gz
+          curl -LO https://github.com/oras-project/oras/releases/download/$ORAS_VERSION/oras_${ORAS_VERSION#v}_linux_amd64.tar.gz
           tar -xzf oras_${ORAS_VERSION#v}_linux_amd64.tar.gz oras
           sudo mv oras /usr/local/bin/
 
       - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Run mirror script
+      - name: Mirror specific AVM Terraform module
         run: |
           chmod +x ./scripts/mirror_tf_avms_to_acr.sh
-          ./scripts/mirror_tf_avms_to_acr.sh
+          FILTER_MODULES="avm-res-authorization-roleassignment" ./scripts/mirror_tf_avms_to_acr.sh
