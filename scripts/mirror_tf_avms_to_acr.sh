@@ -21,15 +21,15 @@ if [[ -z "$HTML_CONTENT" ]]; then
   exit 1
 fi
 
-# Extract modules from anchor tags with trailing slash
-MODULE_NAMES=$(echo "$HTML_CONTENT" | grep -oP '<a href="\K[^/]+(?=/")')
+# Extract modules using awk (safe across environments)
+MODULE_NAMES=$(echo "$HTML_CONTENT" | awk -F 'href="' '/href/ {split($2,a,"/"); print a[1]}' | grep -v '^\.\.$' | sort | uniq)
 
 if [[ -z "$MODULE_NAMES" ]]; then
   echo "❌ No module names found in index HTML. Check parsing logic or page structure."
   exit 1
 fi
 
-echo "$MODULE_NAMES" | sort | uniq | while read -r module_name; do
+echo "$MODULE_NAMES" | while read -r module_name; do
 
   # Filter modules if specified
   if [[ -n "$FILTER_MODULES" && ",$FILTER_MODULES," != *",$module_name,"* ]]; then
@@ -43,14 +43,14 @@ echo "$MODULE_NAMES" | sort | uniq | while read -r module_name; do
   module_url="$AVM_INDEX_URL$module_name/"
   versions_html=$(curl -sSL "$module_url")
 
-  version_names=$(echo "$versions_html" | grep -oP '<a href="\K[^/]+(?=/")')
+  version_names=$(echo "$versions_html" | awk -F 'href="' '/href/ {split($2,a,"/"); print a[1]}' | grep -v '^\.\.$' | sort | uniq)
 
   if [[ -z "$version_names" ]]; then
     echo "⚠️ No versions found for $module_name"
     continue
   fi
 
-  echo "$version_names" | sort | uniq | while read -r version; do
+  echo "$version_names" | while read -r version; do
 
     # Filter versions if specified
     if [[ -n "$FILTER_VERSIONS" && ",$FILTER_VERSIONS," != *",$version,"* ]]; then
