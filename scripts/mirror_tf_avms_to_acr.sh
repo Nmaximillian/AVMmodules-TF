@@ -46,10 +46,13 @@ awk -F',' 'NR > 1 {
     continue
   fi
 
-  # Extract version number from Terraform Registry
-  version=$(curl -sL "$registry_url" | grep -oE '"version":\s*"[^"]+"' | head -n1 | cut -d'"' -f4)
+  # Extract version number using Terraform Registry API
+  api_url="https://registry.terraform.io/v1/modules/${registry_url#https://registry.terraform.io/modules/}"
+  version=$(curl -s "$api_url" | jq -r '.version')
 
-  if [[ -z "$version" ]]; then
+  echo "📌 Extracted version: $version from $api_url"
+
+  if [[ -z "$version" || "$version" == "null" ]]; then
     echo "⚠️ Could not extract version for $module_name — skipping"
     continue
   fi
