@@ -1,0 +1,33 @@
+name: Deploy AVM KeyVault Module
+
+on:
+  workflow_dispatch:
+
+env:
+  ACR_NAME: avmmodulestf.azurecr.io
+  MODULE_VERSION: 0.1.0
+  RESOURCE_GROUP: example-rg
+  LOCATION: westeurope
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
