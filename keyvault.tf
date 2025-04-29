@@ -13,10 +13,10 @@ terraform {
 
 provider "azurerm" {
   features {}
-}
 
-# Get tenant id
-data "azurerm_client_config" "this" {}
+  subscription_id = data.azurerm_client_config.this.subscription_id
+  tenant_id       = data.azurerm_client_config.this.tenant_id
+}
 
 # Randomized region
 module "regions" {
