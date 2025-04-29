@@ -13,12 +13,6 @@ terraform {
       version = "~> 3.5"
     }
   }
-
-    module_mirror {
-      "avmmodulestf.azurecr.io" = {
-        type = "oci"
-      }
-    }
 }
 
 # We need the tenant id for the key vault.
@@ -50,8 +44,7 @@ resource "azurerm_resource_group" "rg" {
 
 # This is the module call
 module "keyvault" {
-  source = "oci://avmmodulestf.azurecr.io/avm-res-keyvault-vault/azurerm"
-  version = "0.1.0"
+  source = "oci://avmmodulestf.azurecr.io/avm-res-keyvault-vault/azurerm:0.1.0"
   # source              = "Azure/avm-res-keyvault-vault/azurerm"
   name                = "zstestkv0101001"
   enable_telemetry    = true
