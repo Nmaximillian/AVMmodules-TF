@@ -44,7 +44,7 @@ resource "azurerm_resource_group" "rg" {
 
 # This is the module call
 module "keyvault" {
-  source  = "vmmodulestf.azurecr.io/avm-res-keyvault-vault/azurerm"
+  source  = "avmmodulestf.azurecr.io/avm-res-keyvault-vault/azurerm"
   version = "0.1.0"
   # source              = "Azure/avm-res-keyvault-vault/azurerm"
   name                = "zstestkv0101001"
