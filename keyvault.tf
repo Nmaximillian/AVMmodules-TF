@@ -43,9 +43,8 @@ resource "azurerm_resource_group" "rg" {
 
 # The KeyVault
 module "keyvault" {
-  source  = "oci://avmmodulestf.azurecr.io/avm-res-keyvault-vault/azurerm"
-  version = "0.1.0"
-
+  source = "./modules/avm-res-keyvault-vault"
+  
   name                = "zstestkv0101001"
   enable_telemetry    = true
   location            = azurerm_resource_group.rg.location

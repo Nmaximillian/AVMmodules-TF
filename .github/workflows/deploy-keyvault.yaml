@@ -26,6 +26,17 @@ jobs:
         with:
           terraform_version: 1.6.6
 
+      - name: Install ORAS
+        run: |
+          curl -LO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
+          tar -zxvf oras_1.1.0_linux_amd64.tar.gz oras
+          sudo mv oras /usr/local/bin/
+      
+      - name: Download KeyVault module from ACR
+        run: |
+          mkdir -p modules/avm-res-keyvault-vault
+          oras pull avmmodulestf.azurecr.io/avm-res-keyvault-vault/azurerm:0.1.0 -o modules/avm-res-keyvault-vault --artifact-type application/vnd.module.terraform
+
       - name: Terraform Init
         run: terraform init
 
