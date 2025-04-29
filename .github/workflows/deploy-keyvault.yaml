@@ -31,10 +31,9 @@ jobs:
         run: |
           curl -LO https://github.com/oras-project/oras/releases/download/v1.1.0/oras_1.1.0_linux_amd64.tar.gz
           tar -zxvf oras_1.1.0_linux_amd64.tar.gz oras
-          chmod +x oras
-          mkdir -p $HOME/bin
-          mv oras $HOME/bin/oras
-          echo "$HOME/bin" >> $GITHUB_PATH
+          sudo mv oras /usr/local/bin/oras
+          hash -r  # <- THIS forces shell to reload the available binaries immediately
+      
       - name: Check ORAS version (force your version)
         run: |
           oras version
