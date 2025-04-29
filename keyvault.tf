@@ -13,6 +13,12 @@ terraform {
       version = "~> 3.5"
     }
   }
+
+    module_mirror {
+      "avmmodulestf.azurecr.io" = {
+        type = "oci"
+      }
+    }
 }
 
 # We need the tenant id for the key vault.
