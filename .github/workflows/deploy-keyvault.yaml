@@ -44,7 +44,7 @@ jobs:
       - name: Download KeyVault module from ACR
         run: |
           mkdir -p modules/avm-res-keyvault-vault
-          oras pull ${{ env.ACR_NAME }}/avm-res-keyvault-vault/azurerm:${{ env.MODULE_VERSION }} -o modules/avm-res-keyvault-vault
+          oras pull ${{ env.ACR_NAME }}/avm-res-keyvault-vault/azurerm:v0.10.0 -o modules/avm-res-keyvault-vault
 
       - name: Terraform Init
         run: terraform init
