@@ -33,7 +33,7 @@ jobs:
           tar -zxvf oras_1.1.0_linux_amd64.tar.gz oras
           sudo mv oras /usr/local/bin/oras
           hash -r  # <- THIS forces shell to reload the available binaries immediately
-      
+
       - name: Check ORAS version (force your version)
         run: |
           oras version
@@ -41,7 +41,7 @@ jobs:
       - name: Download KeyVault module from ACR
         run: |
           mkdir -p modules/avm-res-keyvault-vault
-          oras pull ${{ env.ACR_NAME }}/avm-res-keyvault-vault/azurerm:${{ env.MODULE_VERSION }} -o modules/avm-res-keyvault-vault --artifact-type application/vnd.module.terraform
+          oras pull ${{ env.ACR_NAME }}/avm-res-keyvault-vault/azurerm:${{ env.MODULE_VERSION }} -o modules/avm-res-keyvault-vault application/vnd.module.terraform
 
       - name: Terraform Init
         run: terraform init
