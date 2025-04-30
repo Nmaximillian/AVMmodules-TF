@@ -1,63 +1,42 @@
-name: Mirror AVM Bicep Module Docs to Wiki
+name: Sync Terraform AVMs to Private ACR
 
 on:
   workflow_dispatch:
 
 env:
-  FILTER_MODULES: "ptn/alz/empty"  # 🔍 Comma-separated list of AVM modules (relative to avm/)
+  ACR_NAME: avmmodulestf.azurecr.io
 
 jobs:
-  update-wiki:
+  mirror:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout dummy repo for context
+      - name: Checkout this repo
         uses: actions/checkout@v4
 
-      - name: Set up Git identity for wiki push
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Upgrade Azure CLI
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "github-actions"
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-      - name: Clone AVM Bicep repo
+      - name: Install ORAS CLI
         run: |
-          git clone https://github.com/Azure/bicep-registry-modules avm-upstream
+          ORAS_VERSION=$(curl -s https://api.github.com/repos/oras-project/oras/releases/latest | jq -r '.tag_name')
+          curl -LO https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_amd64.tar.gz
+          tar -xzf oras_${ORAS_VERSION#v}_linux_amd64.tar.gz oras
+          sudo mv oras /usr/local/bin/
 
-      - name: Clone the Wiki repository using PAT
+      - name: ORAS login to ghcr.io
+        run: echo "${{ secrets.GHCR_PAT }}" | oras login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Sync Terraform AVM Modules to ACR with exact versions
         run: |
-          git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.wiki.git avm-wiki
-
-      - name: Extract filtered README.md files and format for Wiki (flattened paths)
-        run: |
-          set -e
-          cd avm-wiki
-          rm -rf ./*
-
-          echo "# Azure Verified Modules (Bicep) – Internal Mirror" > Home.md
-          echo "" >> Home.md
-          echo "This page is auto-generated from [Azure/bicep-registry-modules](https://github.com/Azure/bicep-registry-modules)." >> Home.md
-          echo "" >> Home.md
-          echo "## Modules" >> Home.md
-          echo "" >> Home.md
-
-          FILTER_LIST=$(echo "$FILTER_MODULES" | tr ',' '\n')
-
-          for module_path in $FILTER_LIST; do
-            readme_path="../avm-upstream/avm/$module_path/README.md"
-            if [[ -f "$readme_path" ]]; then
-              wiki_slug=$(echo "$module_path" | sed 's|/|-|g')  # flatten path
-              mkdir -p "$wiki_slug"
-              cp "$readme_path" "$wiki_slug/Home.md"
-              echo "- [$module_path](./$wiki_slug)" >> Home.md
-              echo "✅ Mirrored: $module_path → $wiki_slug/Home.md"
-            else
-              echo "❌ Skipped: $module_path (README.md not found)"
-            fi
-          done
-
-      - name: Push updates to Wiki
-        run: |
-          cd avm-wiki
-          git add .
-          git commit -m "🔄 Update AVM docs (filtered modules: $FILTER_MODULES)" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.wiki.git HEAD:master
+          chmod +x ./scripts/mirror_tf_avms_to_acr.sh
+          ./scripts/mirror_tf_avms_to_acr.sh
