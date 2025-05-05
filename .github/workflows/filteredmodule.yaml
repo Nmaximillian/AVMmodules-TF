@@ -35,4 +35,4 @@ jobs:
       - name: Mirror specific AVM Terraform module
         run: |
           chmod +x ./scripts/mirror_tf_avms_to_acr.sh
-          FILTER_MODULES="avm-res-authorization-roleassignment" ./scripts/mirror_tf_avms_to_acr.sh
+          FILTER_MODULES="avm-res-keyvault-vault" ./scripts/mirror_tf_avms_to_acr.sh
