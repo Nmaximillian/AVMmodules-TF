@@ -42,20 +42,7 @@ for CSV_URL in "${CSV_URLS[@]}"; do
 
     echo "🧪 Found available module: $module_name"
 
-    
-IFS=',' read -ra FILTERED <<< "$FILTER_MODULES"
-match_found=false
-for filter in "${FILTERED[@]}"; do
-  if [[ "$filter" == "$module_name" ]]; then
-    match_found=true
-    break
-  fi
-done
-if [[ "$match_found" == false ]]; then
-  echo "⏭️ Skipping module $module_name (not in FILTER_MODULES)"
-  continue
-fi
-
+    if [[ -n "$FILTER_MODULES" && ",${FILTER_MODULES}," != *",${module_name},"* ]]; then
       echo "⏭️ Skipping module $module_name (not in FILTER_MODULES)"
       continue
     fi
